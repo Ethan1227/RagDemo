@@ -61,7 +61,7 @@ class DashScopeConfig(BaseModel):
     base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     llm_model: str = "qwen-max"
     embedding_model: str = "text-embedding-v3"
-    rerank_model: str = "gte-rerank"
+    rerank_model: str = "gte-rerank-v2"
 
 
 class ChatConfig(BaseModel):

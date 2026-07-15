@@ -26,14 +26,20 @@ const routes = [
       {
         path: 'consult',
         name: 'consult',
-        component: () => import('@/views/PlaceholderView.vue'),
-        meta: { title: '法律咨询', phase: '阶段 2' },
+        component: () => import('@/views/ConsultView.vue'),
+        meta: { title: '法律咨询' },
       },
       {
         path: 'knowledge',
         name: 'knowledge',
-        component: () => import('@/views/PlaceholderView.vue'),
-        meta: { title: '知识库管理', phase: '阶段 2' },
+        component: () => import('@/views/KnowledgeView.vue'),
+        meta: { title: '知识库管理' },
+      },
+      {
+        path: 'knowledge/doc/:docId',
+        name: 'knowledge-preview',
+        component: () => import('@/views/KnowledgePreviewView.vue'),
+        meta: { title: '知识库预览' },
       },
       {
         path: 'case',
