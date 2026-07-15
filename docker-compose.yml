@@ -1,0 +1,114 @@
+# 民事纠纷诉状生成与咨询 RAG 系统 —— 基础设施编排
+#
+# 服务说明：
+#   1) Milvus 向量库栈（etcd + minio + milvus standalone）——服务名/容器名与已有 ragdemo 项目容器对齐以复用，不重复下载镜像
+#   2) legal-rag-mysql ——本项目专用 MySQL 8.0，映射到宿主机 3307（避开已被 ai-learn-mysql 占用的 3306）
+#   3) legal-rag-minio ——本项目应用层对象存储（证据/文书/上传原件），端口 9200/9201（避开独立 minio 的 9100/9101）
+#
+# 启动：docker compose up -d
+name: ragdemo
+
+services:
+  # ---------- Milvus 依赖：etcd ----------
+  etcd:
+    container_name: milvus-etcd
+    image: quay.io/coreos/etcd:v3.5.5
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - ./volumes/etcd:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  # ---------- Milvus 依赖：内部 MinIO（仅供 Milvus 存储，不对外暴露） ----------
+  minio:
+    container_name: milvus-minio
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    volumes:
+      - ./volumes/milvus-minio:/minio_data
+    command: minio server /minio_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  # ---------- Milvus 向量数据库（standalone） ----------
+  milvus:
+    container_name: milvus-standalone
+    image: milvusdb/milvus:v2.4.1
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MINIO_ACCESS_KEY_ID: minioadmin
+      MINIO_SECRET_ACCESS_KEY: minioadmin
+    volumes:
+      - ./volumes/milvus:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    depends_on:
+      - etcd
+      - minio
+    restart: unless-stopped
+
+  # ---------- 本项目专用 MySQL ----------
+  mysql:
+    container_name: legal-rag-mysql
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: legal_rag
+      MYSQL_USER: legal_user
+      MYSQL_PASSWORD: legal_pass
+      TZ: Asia/Shanghai
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./volumes/mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot123"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ---------- 本项目应用层对象存储 MinIO ----------
+  app-minio:
+    container_name: legal-rag-minio
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: minio server /data --console-address ":9001"
+    ports:
+      - "9200:9000"
+      - "9201:9001"
+    volumes:
+      - ./volumes/app-minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
