@@ -30,6 +30,8 @@ dependencies = [
     "rank-bm25>=0.2.2",
     "minio>=7.2.20",
     "setuptools<81",
+    "paddlepaddle>=3.3.1",
+    "paddleocr>=3.7.0",
 ]
 
 [dependency-groups]

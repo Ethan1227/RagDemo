@@ -43,11 +43,11 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const features = [
-  { name: 'consult', title: '法律咨询', icon: 'ChatDotRound', phase: '阶段 2', desc: '选择知识库，就诉讼时效、管辖、举证责任等问题智能问答。' },
-  { name: 'knowledge', title: '知识库管理', icon: 'Collection', phase: '阶段 2', desc: '导入法律法规、司法解释、类案案例并向量化检索。' },
-  { name: 'case', title: '案件信息', icon: 'Document', phase: '阶段 3', desc: '分步填写原被告、案由、诉讼请求与事实理由，支持暂存。' },
-  { name: 'evidence', title: '证据材料', icon: 'UploadFilled', phase: '阶段 3', desc: '上传证据并 OCR 识别关键信息，支持分类标注。' },
-  { name: 'complaint', title: '起诉状生成', icon: 'EditPen', phase: '阶段 3', desc: '结合案件信息与法律检索，一键生成规范起诉状草稿。' },
+  { name: 'consult', title: '法律咨询', icon: 'ChatDotRound', desc: '选择知识库，就诉讼时效、管辖、举证责任等问题智能问答。' },
+  { name: 'knowledge', title: '知识库管理', icon: 'Collection', desc: '导入法律法规、司法解释、类案案例并向量化检索。' },
+  { name: 'case', title: '案件信息', icon: 'Document', desc: '分步填写原被告、案由、诉讼请求与事实理由，支持暂存。' },
+  { name: 'evidence', title: '证据材料', icon: 'UploadFilled', desc: '上传证据并 OCR 识别关键信息，支持分类标注。' },
+  { name: 'complaint', title: '起诉状生成', icon: 'EditPen', desc: '结合案件信息与法律检索，一键生成规范起诉状草稿。' },
 ]
 
 function go(name) {

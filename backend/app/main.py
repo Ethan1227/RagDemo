@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from backend.app.api import auth, chat, kb
+from backend.app.api import auth, case, chat, complaint, evidence, kb
 from backend.app.core.config import get_settings
 from backend.app.core.logging import setup_logging
 from backend.app.db.session import init_db
@@ -51,6 +51,9 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(kb.router)
 app.include_router(chat.router)
+app.include_router(case.router)
+app.include_router(evidence.router)
+app.include_router(complaint.router)
 
 
 @app.get("/health", tags=["系统"], summary="健康检查")

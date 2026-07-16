@@ -23,6 +23,8 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import StaticPool
 
 import backend.app.api.chat as chat_module
+import backend.app.api.complaint as complaint_module
+import backend.app.api.evidence as evidence_module
 import backend.app.api.kb as kb_module
 import backend.app.models  # noqa: F401  确保模型注册到 Base.metadata
 from backend.app.db.session import Base, get_db
@@ -52,11 +54,15 @@ async def client(
             yield session
 
     app.dependency_overrides[get_db] = _override_get_db
-    # kb 后台解析任务 / chat 流式生成器使用独立会话工厂，测试中一并替换
+    # kb/chat/evidence/complaint 的后台任务与流式生成器使用独立会话工厂，测试中一并替换
     kb_orig = kb_module.async_session_maker
     chat_orig = chat_module.async_session_maker
+    evidence_orig = evidence_module.async_session_maker
+    complaint_orig = complaint_module.async_session_maker
     kb_module.async_session_maker = db_session_maker
     chat_module.async_session_maker = db_session_maker
+    evidence_module.async_session_maker = db_session_maker
+    complaint_module.async_session_maker = db_session_maker
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -64,6 +70,8 @@ async def client(
 
     kb_module.async_session_maker = kb_orig
     chat_module.async_session_maker = chat_orig
+    evidence_module.async_session_maker = evidence_orig
+    complaint_module.async_session_maker = complaint_orig
     app.dependency_overrides.clear()
 
 
@@ -149,4 +157,33 @@ def mock_vector_stack(monkeypatch: pytest.MonkeyPatch) -> dict:
         "backend.app.services.milvus_store.delete_by_chunk_ids", fake_delete_by_chunk_ids
     )
     monkeypatch.setattr("backend.app.services.milvus_store.delete_by_kb", fake_delete_by_kb)
+    return calls
+
+
+@pytest.fixture
+def mock_evidence_stack(monkeypatch: pytest.MonkeyPatch) -> dict:
+    """屏蔽 MinIO / PaddleOCR / qwen 抽取，模拟 OCR 与抽取结果。"""
+    calls: dict = {"removed": []}
+
+    async def fake_save_file(prefix, filename, data, content_type="application/octet-stream"):
+        return f"{prefix}/fake-object"
+
+    async def fake_remove_file(object_name):
+        calls["removed"].append(object_name)
+
+    async def fake_recognize(filename, data):
+        return "借款人张三于2024年1月1日向李四借款人民币50000元，约定一年内归还。"
+
+    async def fake_extract(text):
+        return {
+            "parties": ["张三", "李四"],
+            "amounts": ["人民币50000元"],
+            "dates": ["2024年1月1日"],
+            "summary": "张三向李四借款5万元的借条",
+        }
+
+    monkeypatch.setattr("backend.app.services.storage.save_file", fake_save_file)
+    monkeypatch.setattr("backend.app.services.storage.remove_file", fake_remove_file)
+    monkeypatch.setattr("backend.app.services.ocr.recognize", fake_recognize)
+    monkeypatch.setattr("backend.app.services.extractor.extract", fake_extract)
     return calls
