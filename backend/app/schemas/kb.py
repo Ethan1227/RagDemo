@@ -60,3 +60,16 @@ class ChunkPage(BaseModel):
 
 class ChunkUpdateRequest(BaseModel):
     content: str = Field(..., min_length=1, description="块的新内容")
+
+
+class ChunkPreviewItem(BaseModel):
+    chunk_index: int
+    content: str
+    char_count: int
+
+
+class ChunkPreviewOut(BaseModel):
+    """切块预览结果：总块数 + 前若干块（不落库）。"""
+
+    total: int
+    items: list[ChunkPreviewItem]

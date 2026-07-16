@@ -6,6 +6,13 @@
       </template>
     </el-page-header>
 
+    <!-- 文档信息条：克制展示基本信息，不抢内容焦点 -->
+    <div class="doc-infobar">
+      <span v-if="kbName">所属知识库：{{ kbName }}</span>
+      <span v-if="chunkSize">切块参数：{{ chunkSize }} / 重叠 {{ chunkOverlap }}</span>
+      <span>总块数：{{ total }}</span>
+    </div>
+
     <el-empty v-if="!loading && chunks.length === 0" description="该文档暂无文档块" />
 
     <div class="chunk-list" v-loading="loading">
@@ -62,6 +69,9 @@ const router = useRouter()
 
 const docId = Number(route.params.docId)
 const filename = ref(route.query.filename || `文档 ${docId}`)
+const kbName = ref(route.query.kb || '')
+const chunkSize = ref(route.query.size || '')
+const chunkOverlap = ref(route.query.overlap || '')
 
 const chunks = ref([])
 const total = ref(0)
@@ -129,6 +139,18 @@ onMounted(loadChunks)
 .page-title {
   font-weight: 600;
   color: var(--brand-primary);
+}
+
+.doc-infobar {
+  display: flex;
+  gap: 24px;
+  margin-top: 14px;
+  padding: 8px 14px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
 }
 
 .chunk-list {

@@ -146,3 +146,39 @@ async def test_delete_document_and_kb(client: AsyncClient, auth_headers, mock_ve
     assert kb["id"] in mock_vector_stack["deleted_kbs"]
     kbs = (await client.get("/api/kb", headers=auth_headers)).json()
     assert all(k["id"] != kb["id"] for k in kbs)
+
+
+async def test_preview_chunks(client: AsyncClient, auth_headers):
+    """切块预览：返回总块数与前若干块，不创建任何文档记录。"""
+    resp = await client.post(
+        "/api/kb/preview-chunks",
+        files={"file": ("民法典节选.txt", SAMPLE_TEXT.encode("utf-8"), "text/plain")},
+        data={"chunk_size": "128", "chunk_overlap": "20"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["total"] >= 1
+    assert len(body["items"]) <= 5
+    assert body["items"][0]["chunk_index"] == 0
+    assert body["items"][0]["char_count"] == len(body["items"][0]["content"])
+
+
+async def test_preview_chunks_invalid_overlap(client: AsyncClient, auth_headers):
+    resp = await client.post(
+        "/api/kb/preview-chunks",
+        files={"file": ("a.txt", b"hello", "text/plain")},
+        data={"chunk_size": "128", "chunk_overlap": "128"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 400
+    assert "重叠大小" in resp.json()["detail"]
+
+
+async def test_preview_chunks_unsupported_type(client: AsyncClient, auth_headers):
+    resp = await client.post(
+        "/api/kb/preview-chunks",
+        files={"file": ("图片.png", b"fake", "image/png")},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 400

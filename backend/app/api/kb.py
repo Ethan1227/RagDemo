@@ -27,6 +27,8 @@ from backend.app.models.user import User
 from backend.app.schemas.kb import (
     ChunkOut,
     ChunkPage,
+    ChunkPreviewItem,
+    ChunkPreviewOut,
     ChunkUpdateRequest,
     DocumentOut,
     KbCreateRequest,
@@ -46,6 +48,9 @@ router = APIRouter(
 
 # 上传文件大小上限（50MB），超出显式拒绝
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+
+# 切块预览返回的块数上限
+PREVIEW_CHUNK_COUNT = 5
 
 
 # ---------------- 知识库 CRUD ----------------
@@ -210,6 +215,44 @@ async def upload_document(
 
     background_tasks.add_task(_parse_document_task, doc.id, doc.filename, data)
     return DocumentOut.model_validate(doc)
+
+
+@router.post(
+    "/preview-chunks",
+    response_model=ChunkPreviewOut,
+    summary="预览切块效果（按参数试切，不落库）",
+)
+async def preview_chunks(
+    file: UploadFile = File(...),
+    chunk_size: int = Form(512, ge=64, le=4096),
+    chunk_overlap: int = Form(50, ge=0, le=1024),
+) -> ChunkPreviewOut:
+    if chunk_overlap >= chunk_size:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="重叠大小必须小于切块大小"
+        )
+    try:
+        detect_file_type(file.filename or "")
+    except UnsupportedFileTypeError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="文件超过 50MB 上限"
+        )
+    if not data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="文件内容为空")
+
+    text = extract_text(file.filename or "unnamed", data)
+    chunks = split_text(text, chunk_size, chunk_overlap)
+    return ChunkPreviewOut(
+        total=len(chunks),
+        items=[
+            ChunkPreviewItem(chunk_index=i, content=c, char_count=len(c))
+            for i, c in enumerate(chunks[:PREVIEW_CHUNK_COUNT])
+        ],
+    )
 
 
 @router.get("/{kb_id}/documents", response_model=list[DocumentOut], summary="文档列表")

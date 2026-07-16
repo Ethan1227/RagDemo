@@ -5,9 +5,6 @@
       <template #header>
         <div class="card-header">
           <span>知识库</span>
-          <el-button type="primary" size="small" @click="createDialogVisible = true">
-            <el-icon><Plus /></el-icon>&nbsp;新建
-          </el-button>
         </div>
       </template>
 
@@ -37,6 +34,12 @@
           size="small"
           @click.stop="removeKb(kb)"
         >删除</el-button>
+      </div>
+
+      <!-- 虚线新建卡片入口 -->
+      <div class="kb-create-card" @click="createDialogVisible = true">
+        <el-icon><Plus /></el-icon>
+        <span>新建知识库</span>
       </div>
     </el-card>
 
@@ -107,10 +110,25 @@
           <el-input v-model="createForm.description" type="textarea" :rows="2" maxlength="512" />
         </el-form-item>
         <el-form-item label="检索方式">
-          <el-radio-group v-model="createForm.retrieval_type">
-            <el-radio value="dense">稠密向量检索</el-radio>
-            <el-radio value="hybrid">混合检索（向量 + 关键词）</el-radio>
-          </el-radio-group>
+          <!-- 单选卡片：附说明文字解释二者区别 -->
+          <div class="retrieval-cards">
+            <div
+              class="retrieval-card"
+              :class="{ selected: createForm.retrieval_type === 'dense' }"
+              @click="createForm.retrieval_type = 'dense'"
+            >
+              <div class="retrieval-name">稠密向量检索</div>
+              <div class="retrieval-desc">仅按语义相似度召回，适合表述灵活的自然语言内容</div>
+            </div>
+            <div
+              class="retrieval-card"
+              :class="{ selected: createForm.retrieval_type === 'hybrid' }"
+              @click="createForm.retrieval_type = 'hybrid'"
+            >
+              <div class="retrieval-name">混合检索</div>
+              <div class="retrieval-desc">语义向量 + 关键词加权融合，适合含法条编号等精确词的文本</div>
+            </div>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -139,12 +157,32 @@
       </el-upload>
       <el-form label-width="110px" class="upload-params">
         <el-form-item label="切块大小(字符)">
-          <el-input-number v-model="uploadParams.chunkSize" :min="64" :max="4096" :step="64" />
+          <div class="param-row">
+            <el-slider v-model="uploadParams.chunkSize" :min="64" :max="4096" :step="64" class="param-slider" />
+            <el-input-number v-model="uploadParams.chunkSize" :min="64" :max="4096" :step="64" size="small" />
+          </div>
         </el-form-item>
         <el-form-item label="重叠大小(字符)">
-          <el-input-number v-model="uploadParams.chunkOverlap" :min="0" :max="1024" :step="10" />
+          <div class="param-row">
+            <el-slider v-model="uploadParams.chunkOverlap" :min="0" :max="1024" :step="10" class="param-slider" />
+            <el-input-number v-model="uploadParams.chunkOverlap" :min="0" :max="1024" :step="10" size="small" />
+          </div>
         </el-form-item>
       </el-form>
+
+      <!-- 预览切块效果：按当前参数试切，帮助判断参数是否合适 -->
+      <div class="preview-bar">
+        <el-button :loading="previewing" :disabled="!uploadFile" @click="previewChunks">
+          预览切块效果
+        </el-button>
+        <span v-if="preview" class="preview-total">共将切分为 {{ preview.total }} 块，以下为前 {{ preview.items.length }} 块</span>
+      </div>
+      <div v-if="preview" class="preview-list">
+        <div v-for="item in preview.items" :key="item.chunk_index" class="preview-item">
+          <div class="preview-head">块 #{{ item.chunk_index + 1 }} · {{ item.char_count }} 字符</div>
+          <div class="preview-content">{{ item.content }}</div>
+        </div>
+      </div>
       <template #footer>
         <el-button @click="uploadDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="uploading" :disabled="!uploadFile" @click="submitUpload">
@@ -175,6 +213,8 @@ const uploadDialogVisible = ref(false)
 const uploading = ref(false)
 const uploadFile = ref(null)
 const uploadParams = reactive({ chunkSize: 512, chunkOverlap: 50 })
+const previewing = ref(false)
+const preview = ref(null)
 
 let pollTimer = null
 
@@ -236,6 +276,25 @@ async function removeKb(kb) {
 
 function onFileChange(file) {
   uploadFile.value = file.raw
+  preview.value = null
+}
+
+/** 按当前参数试切当前文件，展示前几块（不落库） */
+async function previewChunks() {
+  if (uploadParams.chunkOverlap >= uploadParams.chunkSize) {
+    ElMessage.warning('重叠大小必须小于切块大小')
+    return
+  }
+  previewing.value = true
+  try {
+    preview.value = await kbApi.previewChunks(
+      uploadFile.value,
+      uploadParams.chunkSize,
+      uploadParams.chunkOverlap,
+    )
+  } finally {
+    previewing.value = false
+  }
 }
 
 async function submitUpload() {
@@ -254,6 +313,7 @@ async function submitUpload() {
     ElMessage.success('上传成功，正在后台解析')
     uploadDialogVisible.value = false
     uploadFile.value = null
+    preview.value = null
     await loadDocuments()
     await loadKbList()
   } finally {
@@ -278,7 +338,16 @@ async function removeDocument(doc) {
 }
 
 function goPreview(doc) {
-  router.push({ name: 'knowledge-preview', params: { docId: doc.id }, query: { filename: doc.filename } })
+  router.push({
+    name: 'knowledge-preview',
+    params: { docId: doc.id },
+    query: {
+      filename: doc.filename,
+      kb: currentKb.value?.name || '',
+      size: doc.chunk_size,
+      overlap: doc.chunk_overlap,
+    },
+  })
 }
 
 function formatTime(value) {
@@ -367,5 +436,119 @@ onUnmounted(() => clearTimeout(pollTimer))
 
 .upload-params {
   margin-top: 16px;
+}
+
+.param-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.param-slider {
+  flex: 1;
+}
+
+/* 虚线新建知识库卡片 */
+.kb-create-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  border: 1px dashed var(--el-color-primary-light-5);
+  border-radius: var(--radius-base);
+  color: var(--color-primary);
+  font-size: 13px;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.kb-create-card:hover {
+  background: var(--el-color-primary-light-9);
+  border-color: var(--color-primary);
+}
+
+/* 检索方式单选卡片 */
+.retrieval-cards {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.retrieval-card {
+  flex: 1;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
+  padding: 10px 12px;
+  cursor: pointer;
+  line-height: 1.5;
+}
+
+.retrieval-card.selected {
+  border-color: var(--color-primary);
+  background: var(--el-color-primary-light-9);
+}
+
+.retrieval-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.retrieval-card.selected .retrieval-name {
+  color: var(--color-primary);
+}
+
+.retrieval-desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+/* 切块预览 */
+.preview-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.preview-total {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.preview-list {
+  margin-top: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
+  padding: 8px 12px;
+}
+
+.preview-item {
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--color-border);
+}
+
+.preview-item:last-child {
+  border-bottom: none;
+}
+
+.preview-head {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-bottom: 4px;
+}
+
+.preview-content {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 </style>
