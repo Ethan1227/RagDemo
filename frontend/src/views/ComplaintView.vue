@@ -23,11 +23,37 @@
           </el-button>
         </el-form>
 
-        <div v-if="laws.length" class="laws">
-          <div class="laws-title">本案推荐法条</div>
-          <div v-for="(l, i) in laws" :key="i" class="law-line">
-            《{{ l.law }}》{{ l.article }}
-          </div>
+        <!-- 生成依据溯源：案件摘要 / 引用法条 / 知识库来源 -->
+        <div v-if="selectedCase" class="trace-panel">
+          <div class="trace-title">生成依据</div>
+          <el-collapse v-model="traceOpen">
+            <el-collapse-item title="案件信息摘要" name="case">
+              <div class="trace-line"><span>案件</span>{{ selectedCase.title }}</div>
+              <div class="trace-line"><span>案由</span>{{ selectedCase.cause || '未填写' }}</div>
+              <div class="trace-line"><span>原告</span>{{ partyNames(selectedCase.plaintiffs) }}</div>
+              <div class="trace-line"><span>被告</span>{{ partyNames(selectedCase.defendants) }}</div>
+              <div class="trace-line"><span>法院</span>{{ selectedCase.court || '未填写' }}</div>
+            </el-collapse-item>
+            <el-collapse-item :title="`引用法条（${laws.length}）`" name="laws" :disabled="laws.length === 0">
+              <div v-for="(l, i) in laws" :key="i" class="law-line">
+                《{{ l.law }}》{{ l.article }}
+              </div>
+            </el-collapse-item>
+            <el-collapse-item
+              :title="`知识库来源（${citations.length}）`"
+              name="citations"
+              :disabled="citations.length === 0"
+            >
+              <div
+                v-for="c in citations"
+                :key="c.index"
+                class="trace-citation"
+                @click="openSource(c.index)"
+              >
+                [{{ c.index }}] {{ c.kb_name }} / {{ c.filename }}
+              </div>
+            </el-collapse-item>
+          </el-collapse>
         </div>
 
         <el-divider />
@@ -66,6 +92,14 @@
         <div v-else ref="printArea" class="doc-preview" v-html="renderedContent" />
       </el-card>
     </div>
+
+    <!-- 溯源面板：展示知识库来源完整片段 -->
+    <SourcePanel
+      v-model="sourceVisible"
+      :citations="citations"
+      :active-index="sourceActiveIndex"
+      title="生成依据溯源"
+    />
   </div>
 </template>
 
@@ -77,6 +111,7 @@ import DOMPurify from 'dompurify'
 import { complaintApi, streamGenerate } from '@/api/complaint'
 import { caseApi } from '@/api/case'
 import { kbApi } from '@/api/kb'
+import SourcePanel from '@/components/SourcePanel.vue'
 
 const cases = ref([])
 const kbList = ref([])
@@ -84,6 +119,24 @@ const history = ref([])
 const selectedCaseId = ref(null)
 const selectedKbIds = ref([])
 const laws = ref([])
+
+// 生成依据溯源
+const citations = ref([])
+const traceOpen = ref(['case'])
+const sourceVisible = ref(false)
+const sourceActiveIndex = ref(null)
+
+const selectedCase = computed(() => cases.value.find((c) => c.id === selectedCaseId.value) || null)
+
+function partyNames(parties) {
+  const names = (parties || []).map((p) => p.name).filter(Boolean)
+  return names.length ? names.join('、') : '未填写'
+}
+
+function openSource(index) {
+  sourceActiveIndex.value = index
+  sourceVisible.value = true
+}
 
 const content = ref('')
 const currentComplaintId = ref(null)
@@ -101,6 +154,7 @@ async function onCaseChange(caseId) {
   content.value = ''
   currentComplaintId.value = null
   laws.value = []
+  citations.value = []
   await loadHistory(caseId)
 }
 
@@ -113,9 +167,17 @@ async function generate() {
   editing.value = false
   content.value = ''
   laws.value = []
+  citations.value = []
   try {
     await streamGenerate(selectedCaseId.value, selectedKbIds.value, {
-      onLaws(l) { laws.value = l },
+      onLaws(l) {
+        laws.value = l
+        traceOpen.value = ['laws']
+      },
+      onCitations(c) {
+        citations.value = c
+        if (c.length) traceOpen.value = ['citations']
+      },
       onDelta(delta) { content.value += delta },
       onDone(e) {
         currentComplaintId.value = e.complaint_id
@@ -136,6 +198,7 @@ async function loadComplaint(h) {
   content.value = data.content
   currentComplaintId.value = data.id
   laws.value = []
+  citations.value = []
   editing.value = false
 }
 
@@ -205,23 +268,39 @@ onMounted(async () => {
   flex: 1;
   min-width: 0;
 }
-.laws {
+.trace-panel {
   margin-top: 16px;
-  background: #fbfaf5;
-  border: 1px solid #efe3c3;
-  border-radius: 8px;
-  padding: 10px 12px;
 }
-.laws-title,
+.trace-title,
 .history-title {
   font-weight: 600;
   color: var(--brand-primary);
   font-size: 13px;
   margin-bottom: 8px;
 }
+.trace-line {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  padding: 3px 0;
+  display: flex;
+  gap: 8px;
+}
+.trace-line span {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+.trace-citation {
+  font-size: 12px;
+  color: var(--color-primary);
+  padding: 4px 0;
+  cursor: pointer;
+}
+.trace-citation:hover {
+  text-decoration: underline;
+}
 .law-line {
   font-size: 12px;
-  color: #8a6d3b;
+  color: var(--color-text-secondary);
   padding: 3px 0;
 }
 .history-item {

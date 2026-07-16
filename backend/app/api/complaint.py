@@ -2,6 +2,7 @@
 
 流式协议（text/event-stream）：
   {"type":"laws","laws":[...]}          推荐法条
+  {"type":"citations","citations":[...]}  知识库引用来源（选择知识库增强时推送，供前端溯源面板）
   {"type":"delta","content":"..."}      增量正文
   {"type":"done","complaint_id":N}      完成，含落库草稿 id
   {"type":"error","detail":"..."}       异常
@@ -18,6 +19,7 @@ from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.app.api.chat import CITATION_SNIPPET_LEN
 from backend.app.api.deps import get_current_user
 from backend.app.db.session import async_session_maker, get_db
 from backend.app.models.case import Case, Complaint, Evidence
@@ -86,6 +88,19 @@ async def _stream_generate(
                     kb_contexts = await retriever.retrieve(db, query, kb_ids, top_k=3)
                 except Exception as exc:
                     logger.warning("起诉状知识库检索失败：{}", exc)
+            # 引用来源结构与 chat 的 citations 事件保持一致，前端溯源面板复用
+            citations = [
+                {
+                    "index": i,
+                    "chunk_id": ctx["chunk_id"],
+                    "kb_name": ctx["kb_name"],
+                    "filename": ctx["filename"],
+                    "score": ctx["score"],
+                    "snippet": ctx["content"][:CITATION_SNIPPET_LEN],
+                }
+                for i, ctx in enumerate(kb_contexts, start=1)
+            ]
+            yield _sse({"type": "citations", "citations": citations})
 
             # 流式生成
             async for delta in complaint_gen.generate_stream(

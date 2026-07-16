@@ -83,21 +83,19 @@
         />
         <div v-for="(msg, idx) in messages" :key="idx" class="message" :class="msg.role">
           <div class="bubble">
-            <div v-if="msg.role === 'assistant'" class="md" v-html="renderMarkdown(msg.content)" />
+            <div
+              v-if="msg.role === 'assistant'"
+              class="md"
+              v-html="renderWithCitations(msg.content, msg.citations)"
+              @click="onAnswerClick($event, msg)"
+            />
             <div v-else class="plain">{{ msg.content }}</div>
 
-            <!-- 引用来源 -->
-            <el-collapse v-if="msg.citations?.length" class="citations">
-              <el-collapse-item :title="`引用来源（${msg.citations.length}）`">
-                <div v-for="c in msg.citations" :key="c.index" class="citation-item">
-                  <div class="citation-title">
-                    [{{ c.index }}] {{ c.kb_name }} / {{ c.filename }}
-                    <el-tag size="small" effect="plain">相关度 {{ c.score }}</el-tag>
-                  </div>
-                  <div class="citation-snippet">{{ c.snippet }}…</div>
-                </div>
-              </el-collapse-item>
-            </el-collapse>
+            <!-- 引用来源：点击行内 [n] 角标或此入口打开溯源面板 -->
+            <div v-if="msg.citations?.length" class="citation-entry" @click="openSourcePanel(msg)">
+              <el-icon><Link /></el-icon>
+              <span>引用来源（{{ msg.citations.length }}）· 查看溯源</span>
+            </div>
           </div>
         </div>
         <div v-if="streaming && !messages.at(-1)?.content" class="message assistant">
@@ -124,16 +122,23 @@
         >发 送</el-button>
       </div>
     </div>
+
+    <!-- 溯源面板：展示当前选中回答的引用来源 -->
+    <SourcePanel
+      v-model="sourceVisible"
+      :citations="sourceCitations"
+      :active-index="sourceActiveIndex"
+    />
   </div>
 </template>
 
 <script setup>
 import { nextTick, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
 import { chatApi, streamChat } from '@/api/chat'
 import { kbApi } from '@/api/kb'
+import { renderWithCitations } from '@/utils/citation'
+import SourcePanel from '@/components/SourcePanel.vue'
 
 const sessions = ref([])
 const currentSession = ref(null)
@@ -142,6 +147,11 @@ const kbList = ref([])
 const question = ref('')
 const streaming = ref(false)
 const messagesRef = ref(null)
+
+// 溯源面板状态
+const sourceVisible = ref(false)
+const sourceCitations = ref([])
+const sourceActiveIndex = ref(null)
 
 const settingsForm = reactive({
   kb_ids: [],
@@ -152,8 +162,17 @@ const settingsForm = reactive({
   history_rounds: 5,
 })
 
-function renderMarkdown(text) {
-  return DOMPurify.sanitize(marked.parse(text || ''))
+/** 点击回答正文中的 [n] 角标时，打开溯源面板并定位到第 n 条来源 */
+function onAnswerClick(event, msg) {
+  const ref = event.target.closest('.citation-ref')
+  if (!ref) return
+  openSourcePanel(msg, Number(ref.dataset.index))
+}
+
+function openSourcePanel(msg, index = null) {
+  sourceCitations.value = msg.citations || []
+  sourceActiveIndex.value = index
+  sourceVisible.value = true
 }
 
 function syncSettings(session) {
@@ -441,30 +460,45 @@ onMounted(async () => {
   margin: 10px 0;
 }
 
-.citations {
-  margin-top: 10px;
-  --el-collapse-header-height: 34px;
+/* 行内引用角标（v-html 注入，需 :deep） */
+.md :deep(.citation-ref) {
+  display: inline-block;
+  min-width: 16px;
+  padding: 0 3px;
+  margin: 0 2px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 16px;
+  border-radius: var(--radius-base);
+  background: var(--el-color-primary-light-9);
+  color: var(--color-primary);
+  border: 1px solid var(--el-color-primary-light-7);
+  cursor: pointer;
+  user-select: none;
 }
 
-.citation-item {
-  padding: 8px 0;
-  border-bottom: 1px dashed var(--brand-border);
+.md :deep(.citation-ref:hover) {
+  background: var(--color-primary);
+  color: #fff;
 }
 
-.citation-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--brand-primary);
-  display: flex;
+/* 回答底部溯源入口 */
+.citation-entry {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
+  margin-top: 10px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--color-primary);
+  border: 1px solid var(--el-color-primary-light-7);
+  border-radius: var(--radius-base);
+  cursor: pointer;
+  background: var(--color-bg-card);
 }
 
-.citation-snippet {
-  font-size: 12px;
-  color: var(--brand-text-muted);
-  margin-top: 4px;
-  line-height: 1.6;
+.citation-entry:hover {
+  background: var(--el-color-primary-light-9);
 }
 
 .input-area {

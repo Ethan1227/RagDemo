@@ -21,7 +21,7 @@ export const complaintApi = {
 
 /**
  * 流式生成起诉状（fetch + ReadableStream，复用 chat 的 SSE 模式）。
- * handlers: { onLaws, onDelta, onDone, onError }
+ * handlers: { onLaws, onCitations, onDelta, onDone, onError }
  */
 export async function streamGenerate(caseId, kbIds, handlers) {
   const token = localStorage.getItem('access_token')
@@ -52,6 +52,7 @@ export async function streamGenerate(caseId, kbIds, handlers) {
       if (!line.startsWith('data: ')) continue
       const event = JSON.parse(line.slice(6))
       if (event.type === 'laws') handlers.onLaws?.(event.laws)
+      else if (event.type === 'citations') handlers.onCitations?.(event.citations)
       else if (event.type === 'delta') handlers.onDelta?.(event.content)
       else if (event.type === 'done') handlers.onDone?.(event)
       else if (event.type === 'error') handlers.onError?.(event.detail)

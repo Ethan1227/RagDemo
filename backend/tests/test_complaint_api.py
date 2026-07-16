@@ -130,3 +130,45 @@ async def test_complaint_list_and_delete(client: AsyncClient, auth_headers, mock
     resp = await client.delete(f"/api/complaints/{cid}", headers=auth_headers)
     assert resp.status_code == 204
     assert (await client.get("/api/complaints", headers=auth_headers)).json() == []
+
+
+FAKE_KB_CONTEXT = {
+    "chunk_id": 1,
+    "content": "合同双方应当按照约定全面履行自己的义务。",
+    "score": 0.92,
+    "document_id": 1,
+    "filename": "民法典合同编.txt",
+    "kb_id": 1,
+    "kb_name": "法律法规库",
+}
+
+
+@pytest.fixture
+def mock_retrieve(monkeypatch: pytest.MonkeyPatch):
+    async def fake_retrieve(db, query, kb_ids, top_k):
+        return [FAKE_KB_CONTEXT]
+
+    monkeypatch.setattr("backend.app.services.retriever.retrieve", fake_retrieve)
+
+
+async def test_generate_stream_with_kb_citations(
+    client: AsyncClient, auth_headers, mock_gen, mock_retrieve
+):
+    """选择知识库增强时，SSE 流应推送 citations 事件供前端溯源面板使用。"""
+    case_id = await _prepare_case(client, auth_headers)
+    resp = await client.post(
+        "/api/complaints/generate/stream",
+        json={"case_id": case_id, "kb_ids": [1]},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+
+    events = _parse_sse(resp.text)
+    types = [e["type"] for e in events]
+    # 事件顺序：laws, citations, delta..., done
+    assert "citations" in types, f"应包含 citations 事件，实际事件类型：{types}"
+    ci = events[types.index("citations")]
+    assert len(ci["citations"]) == 1
+    assert ci["citations"][0]["kb_name"] == "法律法规库"
+    assert ci["citations"][0]["index"] == 1
+    assert ci["citations"][0]["snippet"]

@@ -1,0 +1,103 @@
+/* Design Tokens —— 全站唯一视觉变量来源（依据《法律RAG系统_前端UI设计提示词方案》）
+ * 修改配色/圆角/阴影只改本文件；禁止使用 Element Plus 默认配色。
+ */
+
+/* ---- SCSS 变量 ---- */
+
+// 主色：深蓝，象征专业与信赖
+$color-primary: #0f2a4a;
+$color-primary-light: #14315c;
+$color-primary-dark: #0a1e36;
+
+// 石墨灰系：正文、边框、次要信息
+$color-text-primary: #2d3748;
+$color-text-secondary: #4a5568;
+$color-text-muted: #718096;
+$color-text-placeholder: #a0aec0;
+
+// 背景与边框
+$color-bg-page: #f7f8fa;
+$color-bg-card: #ffffff;
+$color-border: #e2e8f0;
+
+// 低饱和状态色
+$color-success: #2f855a;
+$color-warning: #c05621;
+$color-danger: #c53030;
+
+// 圆角：小圆角，克制而非圆润
+$radius-base: 4px;
+
+// 阴影：极浅投影，不做强立体感
+$shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
+
+// 间距阶梯（8px 网格）
+$space-1: 4px;
+$space-2: 8px;
+$space-3: 12px;
+$space-4: 16px;
+$space-6: 24px;
+$space-8: 32px;
+
+/* ---- 主色梯度（覆盖 Element Plus 需要 light-3~9 / dark-2） ---- */
+$color-primary-light-3: mix(#ffffff, $color-primary, 30%);
+$color-primary-light-5: mix(#ffffff, $color-primary, 50%);
+$color-primary-light-7: mix(#ffffff, $color-primary, 70%);
+$color-primary-light-8: mix(#ffffff, $color-primary, 80%);
+$color-primary-light-9: mix(#ffffff, $color-primary, 90%);
+$color-primary-dark-2: mix(#000000, $color-primary, 20%);
+
+$color-success-light-9: mix(#ffffff, $color-success, 90%);
+$color-warning-light-9: mix(#ffffff, $color-warning, 90%);
+$color-danger-light-9: mix(#ffffff, $color-danger, 90%);
+
+/* ---- 输出 CSS 变量：语义化 token + Element Plus 主题覆盖 ---- */
+:root {
+  /* 语义化 token（业务样式统一引用这些变量） */
+  --color-primary: #{$color-primary};
+  --color-primary-light: #{$color-primary-light};
+  --color-primary-dark: #{$color-primary-dark};
+  --color-text-primary: #{$color-text-primary};
+  --color-text-secondary: #{$color-text-secondary};
+  --color-text-muted: #{$color-text-muted};
+  --color-bg-page: #{$color-bg-page};
+  --color-bg-card: #{$color-bg-card};
+  --color-border: #{$color-border};
+  --color-success: #{$color-success};
+  --color-warning: #{$color-warning};
+  --color-danger: #{$color-danger};
+  --radius-base: #{$radius-base};
+  --shadow-card: #{$shadow-card};
+
+  /* Element Plus 主色覆盖 */
+  --el-color-primary: #{$color-primary};
+  --el-color-primary-light-3: #{$color-primary-light-3};
+  --el-color-primary-light-5: #{$color-primary-light-5};
+  --el-color-primary-light-7: #{$color-primary-light-7};
+  --el-color-primary-light-8: #{$color-primary-light-8};
+  --el-color-primary-light-9: #{$color-primary-light-9};
+  --el-color-primary-dark-2: #{$color-primary-dark-2};
+
+  /* Element Plus 状态色覆盖（低饱和） */
+  --el-color-success: #{$color-success};
+  --el-color-success-light-9: #{$color-success-light-9};
+  --el-color-warning: #{$color-warning};
+  --el-color-warning-light-9: #{$color-warning-light-9};
+  --el-color-danger: #{$color-danger};
+  --el-color-danger-light-9: #{$color-danger-light-9};
+  --el-color-error: #{$color-danger};
+  --el-color-error-light-9: #{$color-danger-light-9};
+
+  /* Element Plus 圆角/边框/文字覆盖 */
+  --el-border-radius-base: #{$radius-base};
+  --el-border-radius-small: 2px;
+  --el-border-color: #{$color-border};
+  --el-border-color-light: #{$color-border};
+  --el-border-color-lighter: #{$color-border};
+  --el-text-color-primary: #{$color-text-primary};
+  --el-text-color-regular: #{$color-text-secondary};
+  --el-text-color-secondary: #{$color-text-muted};
+  --el-text-color-placeholder: #{$color-text-placeholder};
+  --el-bg-color-page: #{$color-bg-page};
+  --el-box-shadow-light: #{$shadow-card};
+}
