@@ -5,7 +5,7 @@
  * renderWithCitations（使用 marked + DOMPurify，需要 jsdom 环境）。
  */
 import { describe, expect, it } from 'vitest'
-import { injectCitationRefs, renderWithCitations } from '../src/utils/citation'
+import { injectCitationRefs, renderWithCitations, splitDisclaimer } from '../src/utils/citation'
 
 // ========================= injectCitationRefs =========================
 
@@ -113,5 +113,45 @@ describe('renderWithCitations', () => {
   it('null/undefined 文本安全返回', () => {
     expect(typeof renderWithCitations(null, [])).toBe('string')
     expect(typeof renderWithCitations(undefined, [])).toBe('string')
+  })
+})
+
+// ========================= splitDisclaimer =========================
+
+describe('splitDisclaimer', () => {
+  const DISCLAIMER = '以上内容仅供参考，不构成正式法律意见，具体案件建议咨询执业律师。'
+
+  it('剥离服务端追加的免责声明（--- 分隔）', () => {
+    const text = `诉讼时效为三年。\n\n---\n${DISCLAIMER}`
+    const { body, hasDisclaimer } = splitDisclaimer(text)
+    expect(hasDisclaimer).toBe(true)
+    expect(body).toBe('诉讼时效为三年。')
+    expect(body).not.toContain(DISCLAIMER)
+  })
+
+  it('无免责声明时原样返回', () => {
+    const { body, hasDisclaimer } = splitDisclaimer('诉讼时效为三年。')
+    expect(hasDisclaimer).toBe(false)
+    expect(body).toBe('诉讼时效为三年。')
+  })
+
+  it('免责声明出现在正文中间不剥离（仅匹配末尾）', () => {
+    const text = `${DISCLAIMER}\n\n但具体分析如下：诉讼时效为三年。`
+    const { body, hasDisclaimer } = splitDisclaimer(text)
+    expect(hasDisclaimer).toBe(false)
+    expect(body).toBe(text)
+  })
+
+  it('空文本安全返回', () => {
+    expect(splitDisclaimer('')).toEqual({ body: '', hasDisclaimer: false })
+    expect(splitDisclaimer(null)).toEqual({ body: '', hasDisclaimer: false })
+    expect(splitDisclaimer(undefined)).toEqual({ body: '', hasDisclaimer: false })
+  })
+
+  it('流式传输中不完整的声明后缀不误剥离', () => {
+    const partial = '诉讼时效为三年。\n\n---\n以上内容仅供参考，不构成'
+    const { body, hasDisclaimer } = splitDisclaimer(partial)
+    expect(hasDisclaimer).toBe(false)
+    expect(body).toBe(partial)
   })
 })

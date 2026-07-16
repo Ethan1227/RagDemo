@@ -40,3 +40,19 @@ export function renderWithCitations(text, citations = []) {
   const html = DOMPurify.sanitize(marked.parse(text || ''))
   return injectCitationRefs(html, citations.length)
 }
+
+// 服务端在回答末尾统一追加的免责声明（见 backend/app/services/prompts.py）
+const DISCLAIMER_TEXT = '以上内容仅供参考，不构成正式法律意见，具体案件建议咨询执业律师。'
+const DISCLAIMER_SUFFIX = new RegExp(`\\n*-{3,}\\n*${DISCLAIMER_TEXT}\\s*$`)
+
+/**
+ * 从回答文本中剥离末尾免责声明，改由统一的 AiNotice 提示条组件展示。
+ *
+ * @param {string} text 助手回答原文
+ * @returns {{ body: string, hasDisclaimer: boolean }}
+ */
+export function splitDisclaimer(text) {
+  if (!text) return { body: '', hasDisclaimer: false }
+  if (!DISCLAIMER_SUFFIX.test(text)) return { body: text, hasDisclaimer: false }
+  return { body: text.replace(DISCLAIMER_SUFFIX, ''), hasDisclaimer: true }
+}

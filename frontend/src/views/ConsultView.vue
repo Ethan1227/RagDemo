@@ -30,49 +30,14 @@
       </div>
     </div>
 
-    <!-- 右侧：对话区 -->
+    <!-- 中栏：对话区 -->
     <div class="chat-panel">
-      <!-- 工具栏：知识库多选 + 模型 + 推理参数 -->
-      <div class="toolbar" v-if="currentSession">
-        <el-select
-          v-model="settingsForm.kb_ids"
-          multiple
-          collapse-tags
-          collapse-tags-tooltip
-          placeholder="选择知识库（可多选）"
-          class="kb-select"
-          @change="saveSettings"
-        >
-          <el-option v-for="kb in kbList" :key="kb.id" :label="kb.name" :value="kb.id" />
-        </el-select>
-
-        <el-select v-model="settingsForm.model" class="model-select" @change="saveSettings">
-          <el-option label="qwen-max" value="qwen-max" />
-          <el-option label="qwen-plus" value="qwen-plus" />
-          <el-option label="qwen-turbo" value="qwen-turbo" />
-        </el-select>
-
-        <el-popover placement="bottom-end" :width="320" trigger="click">
-          <template #reference>
-            <el-button>
-              <el-icon><Setting /></el-icon>&nbsp;推理参数
-            </el-button>
-          </template>
-          <el-form label-width="110px" size="small">
-            <el-form-item :label="`温度 ${settingsForm.temperature}`">
-              <el-slider v-model="settingsForm.temperature" :min="0" :max="2" :step="0.1" @change="saveSettings" />
-            </el-form-item>
-            <el-form-item :label="`Top P ${settingsForm.top_p}`">
-              <el-slider v-model="settingsForm.top_p" :min="0.1" :max="1" :step="0.05" @change="saveSettings" />
-            </el-form-item>
-            <el-form-item label="最长输出">
-              <el-input-number v-model="settingsForm.max_tokens" :min="256" :max="8192" :step="256" @change="saveSettings" />
-            </el-form-item>
-            <el-form-item label="历史对话轮数">
-              <el-input-number v-model="settingsForm.history_rounds" :min="0" :max="20" @change="saveSettings" />
-            </el-form-item>
-          </el-form>
-        </el-popover>
+      <!-- 会话头：会话名 + 参数面板开关 -->
+      <div class="chat-header" v-if="currentSession">
+        <span class="chat-title">{{ currentSession.name }}</span>
+        <el-button text @click="settingsOpen = !settingsOpen">
+          <el-icon><Setting /></el-icon>&nbsp;{{ settingsOpen ? '收起参数' : '模型与参数' }}
+        </el-button>
       </div>
 
       <!-- 消息区 -->
@@ -86,7 +51,7 @@
             <div
               v-if="msg.role === 'assistant'"
               class="md"
-              v-html="renderWithCitations(msg.content, msg.citations)"
+              v-html="renderWithCitations(answerBody(msg), msg.citations)"
               @click="onAnswerClick($event, msg)"
             />
             <div v-else class="plain">{{ msg.content }}</div>
@@ -96,6 +61,9 @@
               <el-icon><Link /></el-icon>
               <span>引用来源（{{ msg.citations.length }}）· 查看溯源</span>
             </div>
+
+            <!-- 回答末尾统一免责提示条 -->
+            <AiNotice v-if="hasNotice(msg)" class="answer-notice" />
           </div>
         </div>
         <div v-if="streaming && !messages.at(-1)?.content" class="message assistant">
@@ -103,24 +71,66 @@
         </div>
       </div>
 
-      <!-- 输入区 -->
-      <div class="input-area">
-        <el-input
-          v-model="question"
-          type="textarea"
-          :rows="3"
-          resize="none"
-          placeholder="请输入您的法律问题，Enter 发送，Shift+Enter 换行"
-          @keydown.enter.exact.prevent="send"
-        />
-        <el-button
-          type="primary"
-          class="send-btn"
-          :loading="streaming"
-          :disabled="!currentSession"
-          @click="send"
-        >发 送</el-button>
+      <!-- 输入区：快捷咨询标签 + 文本框 -->
+      <div class="composer">
+        <div class="quick-tags">
+          <el-tag
+            v-for="t in QUICK_TOPICS"
+            :key="t.label"
+            class="quick-tag"
+            effect="plain"
+            @click="question = t.template"
+          >{{ t.label }}</el-tag>
+        </div>
+        <div class="input-area">
+          <el-input
+            v-model="question"
+            type="textarea"
+            :rows="3"
+            resize="none"
+            placeholder="请输入您的法律问题，Enter 发送，Shift+Enter 换行"
+            @keydown.enter.exact.prevent="send"
+          />
+          <el-button
+            type="primary"
+            class="send-btn"
+            :loading="streaming"
+            :disabled="!currentSession"
+            @click="send"
+          >发 送</el-button>
+        </div>
       </div>
+    </div>
+
+    <!-- 右栏（可折叠）：模型与参数设置面板 -->
+    <div v-show="settingsOpen" class="settings-panel">
+      <div class="settings-title">模型与参数</div>
+      <el-form label-position="top" size="small">
+        <el-form-item label="知识库（可多选）">
+          <el-checkbox-group v-model="settingsForm.kb_ids" class="kb-checks" @change="saveSettings">
+            <el-checkbox v-for="kb in kbList" :key="kb.id" :value="kb.id">{{ kb.name }}</el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
+        <el-form-item label="模型">
+          <el-select v-model="settingsForm.model" @change="saveSettings">
+            <el-option label="qwen-max" value="qwen-max" />
+            <el-option label="qwen-plus" value="qwen-plus" />
+            <el-option label="qwen-turbo" value="qwen-turbo" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="`温度 ${settingsForm.temperature}`">
+          <el-slider v-model="settingsForm.temperature" :min="0" :max="2" :step="0.1" @change="saveSettings" />
+        </el-form-item>
+        <el-form-item :label="`Top P ${settingsForm.top_p}`">
+          <el-slider v-model="settingsForm.top_p" :min="0.1" :max="1" :step="0.05" @change="saveSettings" />
+        </el-form-item>
+        <el-form-item label="最长输出 token">
+          <el-input-number v-model="settingsForm.max_tokens" :min="256" :max="8192" :step="256" @change="saveSettings" />
+        </el-form-item>
+        <el-form-item label="历史对话轮数">
+          <el-input-number v-model="settingsForm.history_rounds" :min="0" :max="20" @change="saveSettings" />
+        </el-form-item>
+      </el-form>
     </div>
 
     <!-- 溯源面板：展示当前选中回答的引用来源 -->
@@ -137,8 +147,18 @@ import { nextTick, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { chatApi, streamChat } from '@/api/chat'
 import { kbApi } from '@/api/kb'
-import { renderWithCitations } from '@/utils/citation'
+import { renderWithCitations, splitDisclaimer } from '@/utils/citation'
 import SourcePanel from '@/components/SourcePanel.vue'
+import AiNotice from '@/components/AiNotice.vue'
+
+// 常见咨询类型快捷模板（点击填充输入框，用户补充案情后发送）
+const QUICK_TOPICS = [
+  { label: '诉讼时效', template: '请问我的纠纷是否已过诉讼时效？情况如下：' },
+  { label: '管辖法院', template: '请问这类纠纷应向哪个法院起诉，管辖法院如何确定？情况如下：' },
+  { label: '举证责任', template: '请问这类案件的举证责任如何分配，我需要准备哪些证据？情况如下：' },
+  { label: '诉讼费用', template: '请问提起这类诉讼需要缴纳多少诉讼费，如何计算？诉讼标的额为：' },
+  { label: '诉讼流程', template: '请问民事诉讼的完整流程和大致时间周期是怎样的？' },
+]
 
 const sessions = ref([])
 const currentSession = ref(null)
@@ -147,6 +167,7 @@ const kbList = ref([])
 const question = ref('')
 const streaming = ref(false)
 const messagesRef = ref(null)
+const settingsOpen = ref(true)
 
 // 溯源面板状态
 const sourceVisible = ref(false)
@@ -161,6 +182,15 @@ const settingsForm = reactive({
   max_tokens: 2048,
   history_rounds: 5,
 })
+
+/** 回答正文（剥离末尾免责声明，由 AiNotice 统一展示） */
+function answerBody(msg) {
+  return splitDisclaimer(msg.content).body
+}
+
+function hasNotice(msg) {
+  return splitDisclaimer(msg.content).hasDisclaimer
+}
 
 /** 点击回答正文中的 [n] 角标时，打开溯源面板并定位到第 n 条来源 */
 function onAnswerClick(event, msg) {
@@ -323,7 +353,7 @@ onMounted(async () => {
   flex-shrink: 0;
   background: #fff;
   border: 1px solid var(--brand-border);
-  border-radius: 10px;
+  border-radius: var(--radius-base);
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -380,23 +410,24 @@ onMounted(async () => {
   flex-direction: column;
   background: #fff;
   border: 1px solid var(--brand-border);
-  border-radius: 10px;
+  border-radius: var(--radius-base);
 }
 
-.toolbar {
+.chat-header {
   display: flex;
-  gap: 10px;
-  padding: 12px 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--brand-border);
 }
 
-.kb-select {
-  flex: 1;
-  max-width: 380px;
-}
-
-.model-select {
-  width: 140px;
+.chat-title {
+  font-size: var(--font-size-h3);
+  font-weight: 600;
+  color: var(--brand-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .messages {
@@ -417,7 +448,7 @@ onMounted(async () => {
 .bubble {
   max-width: 78%;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: 8px;
   font-size: 14px;
   line-height: 1.75;
 }
@@ -428,9 +459,18 @@ onMounted(async () => {
   white-space: pre-wrap;
 }
 
+/* AI 回答：白底卡片 + 细边框，文档质感而非气泡感 */
 .message.assistant .bubble {
-  background: #f4f6f9;
+  background: var(--color-bg-card);
   color: var(--brand-text);
+  border: 1px solid var(--brand-border);
+  border-radius: var(--radius-base);
+  box-shadow: var(--shadow-card);
+  max-width: 88%;
+}
+
+.answer-notice {
+  margin-top: 10px;
 }
 
 .bubble.typing {
@@ -501,16 +541,56 @@ onMounted(async () => {
   background: var(--el-color-primary-light-9);
 }
 
+.composer {
+  border-top: 1px solid var(--brand-border);
+  padding: 10px 16px 14px;
+}
+
+.quick-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.quick-tag {
+  cursor: pointer;
+}
+
 .input-area {
   display: flex;
   gap: 12px;
-  padding: 14px 16px;
-  border-top: 1px solid var(--brand-border);
   align-items: flex-end;
 }
 
 .send-btn {
   height: 72px;
   width: 90px;
+}
+
+/* ---- 右栏：模型与参数（可折叠） ---- */
+.settings-panel {
+  width: 260px;
+  flex-shrink: 0;
+  background: var(--color-bg-card);
+  border: 1px solid var(--brand-border);
+  border-radius: var(--radius-base);
+  padding: 14px 16px;
+  overflow-y: auto;
+}
+
+.settings-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--brand-primary);
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--brand-border);
+}
+
+.kb-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 </style>
