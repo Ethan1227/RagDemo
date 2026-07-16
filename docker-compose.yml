@@ -112,3 +112,38 @@ services:
       timeout: 20s
       retries: 3
     restart: unless-stopped
+
+  # ---------- 应用服务（--profile app 启用，全容器化部署） ----------
+  backend:
+    container_name: legal-rag-backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      # 使用容器专用配置（服务名互联），需先复制 config.docker.example.yaml
+      RAGDEMO_CONFIG: /app/backend/config/config.docker.yaml
+    volumes:
+      - ./backend/config:/app/backend/config:ro
+      - ./logs:/app/logs
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+      app-minio:
+        condition: service_healthy
+    profiles: ["app"]
+    restart: unless-stopped
+
+  frontend:
+    container_name: legal-rag-frontend
+    build:
+      context: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    profiles: ["app"]
+    restart: unless-stopped

@@ -79,6 +79,18 @@ RagDemo/
 
 ## 快速开始
 
+> 完整部署说明（本地开发模式 / Docker 一键部署、配置、排障）见 **[DEPLOY.md](DEPLOY.md)**。
+
+**Docker 一键部署**：
+
+```bash
+cp backend/config/config.docker.example.yaml backend/config/config.docker.yaml   # 填入 api_key
+docker compose --profile app up -d --build
+# 前端 http://localhost:8080
+```
+
+**本地开发模式**：Windows 直接运行 `scripts\start-dev.bat`，或按下述分步启动。
+
 ### 1. 启动基础设施（MySQL / Milvus / MinIO）
 
 ```bash

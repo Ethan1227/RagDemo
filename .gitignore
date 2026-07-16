@@ -26,6 +26,7 @@ coverage.xml
 
 # ===== 配置（含密钥，禁止提交） =====
 backend/config/config.yaml
+backend/config/config.docker.yaml
 .env
 .env.*
 !.env.example

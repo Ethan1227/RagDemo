@@ -1,0 +1,15 @@
+# 后端镜像构建上下文排除项（构建上下文为项目根目录）
+.git
+.idea
+.venv
+venv
+volumes
+logs
+frontend
+data
+uploads
+**/__pycache__
+**/.pytest_cache
+backend/config/config.yaml
+backend/config/config.docker.yaml
+*.md
