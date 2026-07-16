@@ -1,11 +1,9 @@
 <template>
-  <div class="auth-page">
-    <div class="auth-card">
-      <div class="auth-brand">
-        <img class="logo" src="/favicon.svg" alt="logo" />
-        <h1>民事纠纷诉状生成与咨询系统</h1>
-        <p>专业 · 严谨 · 可信赖的法律智能助手</p>
-      </div>
+  <AuthShell>
+    <div class="auth-head">
+      <h2>登录</h2>
+      <p>使用账号密码登录系统</p>
+    </div>
 
       <el-form
         ref="formRef"
@@ -62,8 +60,7 @@
       <div class="auth-switch">
         还没有账号？<router-link to="/register">立即注册</router-link>
       </div>
-    </div>
-  </div>
+  </AuthShell>
 </template>
 
 <script setup>
@@ -73,6 +70,7 @@ import { ElMessage } from 'element-plus'
 import { User, Lock, Key } from '@element-plus/icons-vue'
 import { authApi } from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
+import AuthShell from '@/components/AuthShell.vue'
 
 const router = useRouter()
 const route = useRoute()

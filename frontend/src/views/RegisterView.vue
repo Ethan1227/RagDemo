@@ -1,11 +1,9 @@
 <template>
-  <div class="auth-page">
-    <div class="auth-card">
-      <div class="auth-brand">
-        <img class="logo" src="/favicon.svg" alt="logo" />
-        <h1>注册新账号</h1>
-        <p>创建账号以使用法律咨询与诉状生成服务</p>
-      </div>
+  <AuthShell>
+    <div class="auth-head">
+      <h2>注册新账号</h2>
+      <p>创建账号以使用法律咨询与诉状生成服务</p>
+    </div>
 
       <el-form
         ref="formRef"
@@ -32,6 +30,13 @@
             :prefix-icon="Lock"
             show-password
           />
+          <!-- 密码强度：细窄进度条 + 文字（灰→橙→绿） -->
+          <div v-if="strength.level > 0" class="pwd-strength">
+            <div class="pwd-track">
+              <div class="pwd-fill" :class="`level-${strength.level}`" />
+            </div>
+            <span class="pwd-label" :class="`level-${strength.level}`">{{ strength.label }}</span>
+          </div>
         </el-form-item>
 
         <el-form-item label="确认密码" prop="confirm_password">
@@ -71,16 +76,17 @@
       <div class="auth-switch">
         已有账号？<router-link to="/login">返回登录</router-link>
       </div>
-    </div>
-  </div>
+  </AuthShell>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock, Key } from '@element-plus/icons-vue'
 import { authApi } from '@/api/auth'
+import AuthShell from '@/components/AuthShell.vue'
+import { scorePassword } from '@/utils/password'
 
 const router = useRouter()
 const formRef = ref()
@@ -93,6 +99,8 @@ const form = reactive({
   captcha_id: '',
   captcha_code: '',
 })
+
+const strength = computed(() => scorePassword(form.password))
 
 function validateConfirm(rule, value, callback) {
   if (value !== form.password) {
@@ -113,7 +121,8 @@ const rules = {
   ],
   confirm_password: [
     { required: true, message: '请再次输入密码', trigger: 'blur' },
-    { validator: validateConfirm, trigger: 'blur' },
+    // change 触发：输入过程中即时提示不一致，不用弹窗打断
+    { validator: validateConfirm, trigger: ['blur', 'change'] },
   ],
   captcha_code: [{ required: true, message: '请输入验证码', trigger: 'blur' }],
 }
@@ -143,3 +152,60 @@ async function onSubmit() {
 
 onMounted(refreshCaptcha)
 </script>
+
+<style scoped>
+/* 密码强度：细窄进度条 + 文字，颜色克制（灰→橙→绿） */
+.pwd-strength {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.pwd-track {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.pwd-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.2s, background-color 0.2s;
+}
+
+.pwd-fill.level-1 {
+  width: 33%;
+  background: var(--color-text-placeholder);
+}
+
+.pwd-fill.level-2 {
+  width: 66%;
+  background: var(--color-warning);
+}
+
+.pwd-fill.level-3 {
+  width: 100%;
+  background: var(--color-success);
+}
+
+.pwd-label {
+  font-size: var(--font-size-sm);
+  line-height: 1;
+}
+
+.pwd-label.level-1 {
+  color: var(--color-text-muted);
+}
+
+.pwd-label.level-2 {
+  color: var(--color-warning);
+}
+
+.pwd-label.level-3 {
+  color: var(--color-success);
+}
+</style>
