@@ -5,13 +5,7 @@
         <img src="/favicon.svg" alt="logo" />
         <span>法律智能助手</span>
       </div>
-      <el-menu
-        :default-active="activeMenu"
-        router
-        background-color="transparent"
-        text-color="#c9d6e5"
-        active-text-color="#ffffff"
-      >
+      <el-menu :default-active="activeMenu" router class="aside-menu">
         <el-menu-item index="/">
           <el-icon><HomeFilled /></el-icon><span>首页</span>
         </el-menu-item>
@@ -44,12 +38,12 @@
       </el-header>
 
       <el-main class="layout-main">
-        <router-view />
+        <div class="main-inner">
+          <router-view />
+        </div>
       </el-main>
 
-      <div class="disclaimer-bar">
-        ⚖️ 本系统由 AI 生成内容仅供参考，不构成正式法律意见，具体案件建议咨询执业律师。
-      </div>
+      <AiNotice class="layout-disclaimer" />
     </el-container>
   </el-container>
 </template>
@@ -59,6 +53,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import AiNotice from '@/components/AiNotice.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -89,7 +84,11 @@ async function onLogout() {
 }
 
 .layout-aside {
-  background: linear-gradient(180deg, #142a45 0%, #1d3a5f 100%);
+  background: linear-gradient(
+    180deg,
+    var(--color-primary-dark) 0%,
+    var(--color-primary) 100%
+  );
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -115,6 +114,22 @@ async function onLogout() {
 .layout-aside :deep(.el-menu) {
   border-right: none;
   padding-top: 8px;
+  background: transparent;
+}
+
+/* 深色侧栏上的菜单项：白色系分级，避免硬编码品牌色 */
+.aside-menu :deep(.el-menu-item) {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.aside-menu :deep(.el-menu-item:hover) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.aside-menu :deep(.el-menu-item.is-active) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
 }
 
 .layout-header {
@@ -127,7 +142,7 @@ async function onLogout() {
 }
 
 .header-title {
-  font-size: 17px;
+  font-size: var(--font-size-h3);
   font-weight: 600;
   color: var(--brand-primary);
 }
@@ -137,11 +152,26 @@ async function onLogout() {
   align-items: center;
   gap: 8px;
   color: var(--brand-text-muted);
-  font-size: 14px;
+  font-size: var(--font-size-base);
 }
 
 .layout-main {
   background: var(--brand-bg);
   padding: 24px;
+}
+
+/* 内容区限宽居中（1280px），两侧留白 */
+.main-inner {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  height: 100%;
+}
+
+.layout-disclaimer {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  justify-content: center;
 }
 </style>

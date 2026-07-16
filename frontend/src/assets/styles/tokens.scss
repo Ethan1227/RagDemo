@@ -39,6 +39,17 @@ $space-4: 16px;
 $space-6: 24px;
 $space-8: 32px;
 
+// 字号层级与行高（H1 24 / H2 20 / H3 16 / 正文 14 / 辅助 12，行高 ≥1.5）
+$font-size-h1: 24px;
+$font-size-h2: 20px;
+$font-size-h3: 16px;
+$font-size-base: 14px;
+$font-size-sm: 12px;
+$line-height-base: 1.6;
+
+// 内容区最大宽度（1200～1280px 居中布局）
+$content-max-width: 1280px;
+
 /* ---- 主色梯度（覆盖 Element Plus 需要 light-3~9 / dark-2） ---- */
 $color-primary-light-3: mix(#ffffff, $color-primary, 30%);
 $color-primary-light-5: mix(#ffffff, $color-primary, 50%);
@@ -68,6 +79,13 @@ $color-danger-light-9: mix(#ffffff, $color-danger, 90%);
   --color-danger: #{$color-danger};
   --radius-base: #{$radius-base};
   --shadow-card: #{$shadow-card};
+  --font-size-h1: #{$font-size-h1};
+  --font-size-h2: #{$font-size-h2};
+  --font-size-h3: #{$font-size-h3};
+  --font-size-base: #{$font-size-base};
+  --font-size-sm: #{$font-size-sm};
+  --line-height-base: #{$line-height-base};
+  --content-max-width: #{$content-max-width};
 
   /* Element Plus 主色覆盖 */
   --el-color-primary: #{$color-primary};
@@ -100,4 +118,6 @@ $color-danger-light-9: mix(#ffffff, $color-danger, 90%);
   --el-text-color-placeholder: #{$color-text-placeholder};
   --el-bg-color-page: #{$color-bg-page};
   --el-box-shadow-light: #{$shadow-card};
+  --el-font-size-base: #{$font-size-base};
+  --el-font-size-small: #{$font-size-sm};
 }

@@ -29,6 +29,8 @@ body,
 body {
   font-family: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', Helvetica, Arial,
     sans-serif;
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
   color: var(--brand-text);
   background-color: var(--brand-bg);
   -webkit-font-smoothing: antialiased;
@@ -120,15 +122,4 @@ a {
   margin-top: 18px;
   font-size: 13px;
   color: var(--brand-text-muted);
-}
-
-/* 全局免责声明条 */
-.disclaimer-bar {
-  background: #fbf5e6;
-  color: #8a6d3b;
-  border-top: 1px solid #efe3c3;
-  font-size: 12px;
-  text-align: center;
-  padding: 8px 16px;
-  line-height: 1.6;
 }
