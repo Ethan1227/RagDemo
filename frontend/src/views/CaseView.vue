@@ -41,6 +41,7 @@
           <el-step title="事实与法院" />
           <el-step title="确认提交" />
         </el-steps>
+        <div v-if="lastSavedAt" class="autosave-tip">草稿已自动保存于 {{ lastSavedAt }}</div>
 
         <!-- 步骤 1：当事人 -->
         <div v-show="form.current_step === 0" class="step-body">
@@ -90,15 +91,15 @@
             </el-form-item>
           </el-form>
 
-          <el-card v-if="recommendedLaws.length" class="law-card" shadow="never">
-            <template #header>
-              <span class="law-title"><el-icon><Reading /></el-icon>&nbsp;推荐参考法条（{{ form.cause }}）</span>
-            </template>
-            <div v-for="(law, i) in recommendedLaws" :key="i" class="law-item">
-              <span class="law-ref">《{{ law.law }}》{{ law.article }}</span>
-              <span class="law-summary">{{ law.summary }}</span>
-            </div>
-          </el-card>
+          <!-- 案由推荐法条：浅蓝提示卡，可折叠查看 -->
+          <el-collapse v-if="recommendedLaws.length" v-model="lawsOpen" class="law-collapse">
+            <el-collapse-item :title="`根据该案由，可能适用的法律条文（${recommendedLaws.length}）`" name="laws">
+              <div v-for="(law, i) in recommendedLaws" :key="i" class="law-item">
+                <span class="law-ref">《{{ law.law }}》{{ law.article }}</span>
+                <span class="law-summary">{{ law.summary }}</span>
+              </div>
+            </el-collapse-item>
+          </el-collapse>
         </div>
 
         <!-- 步骤 3：事实与法院 -->
@@ -114,20 +115,40 @@
           </el-form>
         </div>
 
-        <!-- 步骤 4：确认 -->
+        <!-- 步骤 4：确认（各项可点击跳回修改） -->
         <div v-show="form.current_step === 3" class="step-body">
           <el-descriptions :column="1" border>
-            <el-descriptions-item label="案由">{{ form.cause || '未填写' }}</el-descriptions-item>
             <el-descriptions-item label="原告">
               {{ form.plaintiffs.map((p) => p.name).filter(Boolean).join('、') || '未填写' }}
+              <el-button link type="primary" size="small" class="jump-btn" @click="form.current_step = 0">修改</el-button>
             </el-descriptions-item>
             <el-descriptions-item label="被告">
               {{ form.defendants.map((p) => p.name).filter(Boolean).join('、') || '未填写' }}
+              <el-button link type="primary" size="small" class="jump-btn" @click="form.current_step = 0">修改</el-button>
             </el-descriptions-item>
-            <el-descriptions-item label="诉讼请求">{{ form.claims || '未填写' }}</el-descriptions-item>
-            <el-descriptions-item label="致送法院">{{ form.court || '未填写' }}</el-descriptions-item>
-            <el-descriptions-item label="关联证据">
-              {{ relatedEvidenceCount }} 份（在"证据材料"页管理）
+            <el-descriptions-item label="案由">
+              {{ form.cause || '未填写' }}
+              <el-button link type="primary" size="small" class="jump-btn" @click="form.current_step = 1">修改</el-button>
+            </el-descriptions-item>
+            <el-descriptions-item label="诉讼请求">
+              {{ form.claims || '未填写' }}
+              <el-button link type="primary" size="small" class="jump-btn" @click="form.current_step = 1">修改</el-button>
+            </el-descriptions-item>
+            <el-descriptions-item label="事实与理由">
+              {{ form.facts || '未填写' }}
+              <el-button link type="primary" size="small" class="jump-btn" @click="form.current_step = 2">修改</el-button>
+            </el-descriptions-item>
+            <el-descriptions-item label="致送法院">
+              {{ form.court || '未填写' }}
+              <el-button link type="primary" size="small" class="jump-btn" @click="form.current_step = 2">修改</el-button>
+            </el-descriptions-item>
+            <el-descriptions-item :label="`关联证据（${relatedEvidences.length}）`">
+              <template v-if="relatedEvidences.length">
+                <div v-for="e in relatedEvidences" :key="e.id" class="evidence-line">
+                  {{ e.name || e.filename }}<el-tag v-if="e.category" size="small" effect="plain">{{ e.category }}</el-tag>
+                </div>
+              </template>
+              <span v-else>暂无（可在「证据材料」页上传并关联本案件）</span>
             </el-descriptions-item>
           </el-descriptions>
           <el-alert class="next-tip" type="success" :closable="false" show-icon
@@ -152,12 +173,15 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { caseApi } from '@/api/case'
 import { evidenceApi } from '@/api/evidence'
 import PartyForm from '@/components/PartyForm.vue'
+import { formatClock } from '@/utils/format'
 
 const cases = ref([])
 const currentCase = ref(null)
 const causes = ref([])
 const recommendedLaws = ref([])
-const relatedEvidenceCount = ref(0)
+const lawsOpen = ref(['laws'])
+const relatedEvidences = ref([])
+const lastSavedAt = ref('')
 
 const form = reactive({
   current_step: 0,
@@ -190,9 +214,9 @@ async function loadCases() {
 async function selectCase(c) {
   currentCase.value = await caseApi.get(c.id)
   loadForm(currentCase.value)
+  lastSavedAt.value = ''
   if (form.cause) await onCauseChange(form.cause)
-  const evs = await evidenceApi.list(c.id)
-  relatedEvidenceCount.value = evs.length
+  relatedEvidences.value = await evidenceApi.list(c.id)
 }
 
 async function createCase() {
@@ -241,15 +265,22 @@ function buildPayload() {
   }
 }
 
+/** 所有保存路径统一更新"草稿已自动保存于 xx:xx"提示 */
+function touchSaved() {
+  lastSavedAt.value = formatClock(new Date())
+}
+
 async function saveDraft() {
   await caseApi.update(currentCase.value.id, buildPayload())
   await loadCases()
+  touchSaved()
   ElMessage.success('草稿已暂存')
 }
 
 async function nextStep() {
   if (form.current_step < 3) form.current_step += 1
   await caseApi.update(currentCase.value.id, buildPayload())
+  touchSaved()
 }
 
 function prevStep() {
@@ -259,6 +290,7 @@ function prevStep() {
 async function submitComplete() {
   await caseApi.update(currentCase.value.id, { ...buildPayload(), status: 'complete' })
   await loadCases()
+  touchSaved()
   ElMessage.success('案件信息已完成，可前往起诉状生成页')
 }
 
@@ -321,7 +353,14 @@ onMounted(async () => {
   color: var(--brand-text-muted);
 }
 .steps {
-  margin-bottom: 24px;
+  margin-bottom: 8px;
+}
+/* 自动保存细字提示：降低数据丢失焦虑 */
+.autosave-tip {
+  text-align: right;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-bottom: 12px;
 }
 .step-body {
   min-height: 260px;
@@ -339,19 +378,22 @@ onMounted(async () => {
   margin: 0;
   color: var(--brand-primary);
 }
-.law-card {
-  background: #fbfaf5;
-  border: 1px solid #efe3c3;
+/* 案由推荐法条：浅蓝提示卡 */
+.law-collapse {
+  border: 1px solid var(--el-color-primary-light-7);
+  border-radius: var(--radius-base);
+  background: var(--el-color-primary-light-9);
+  padding: 0 12px;
+  --el-collapse-header-bg-color: transparent;
+  --el-collapse-content-bg-color: transparent;
 }
-.law-title {
+.law-collapse :deep(.el-collapse-item__header) {
   font-weight: 600;
-  color: #8a6d3b;
-  display: flex;
-  align-items: center;
+  color: var(--color-primary);
 }
 .law-item {
   padding: 6px 0;
-  border-bottom: 1px dashed #efe3c3;
+  border-bottom: 1px dashed var(--el-color-primary-light-7);
   font-size: 13px;
 }
 .law-ref {
@@ -361,6 +403,15 @@ onMounted(async () => {
 }
 .law-summary {
   color: var(--brand-text-muted);
+}
+.jump-btn {
+  margin-left: 8px;
+}
+.evidence-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
 }
 .next-tip {
   margin-top: 16px;
