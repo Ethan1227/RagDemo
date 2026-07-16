@@ -1,7 +1,8 @@
 <template>
   <div class="complaint-page">
-    <el-alert class="disclaimer" type="warning" :closable="false" show-icon
-      title="AI 生成内容仅供参考，请核实后使用" description="生成的起诉状为辅助草稿，正式使用前请务必核对当事人信息、诉讼请求与法律依据，必要时咨询执业律师。" />
+    <AiNotice tone="warning" class="disclaimer">
+      AI 生成内容仅供参考，请核实后使用：生成的起诉状为辅助草稿，正式使用前请务必核对当事人信息、诉讼请求与法律依据，必要时咨询执业律师。
+    </AiNotice>
 
     <div class="complaint-body">
       <!-- 左：控制区 -->
@@ -112,6 +113,7 @@ import { complaintApi, streamGenerate } from '@/api/complaint'
 import { caseApi } from '@/api/case'
 import { kbApi } from '@/api/kb'
 import SourcePanel from '@/components/SourcePanel.vue'
+import AiNotice from '@/components/AiNotice.vue'
 
 const cases = ref([])
 const kbList = ref([])
@@ -326,6 +328,10 @@ onMounted(async () => {
   display: flex;
   gap: 6px;
 }
+/* 文书区：灰底衬托 A4 纸张卡片 */
+.doc-card :deep(.el-card__body) {
+  background: var(--color-bg-page);
+}
 .generating {
   color: var(--brand-text-muted);
   font-style: italic;
@@ -335,18 +341,38 @@ onMounted(async () => {
 .editor :deep(textarea) {
   font-family: 'Courier New', monospace;
   line-height: 1.9;
+  background: #fff;
 }
+
+/* A4 比例白色文档卡：宋体/衬线正文，与系统界面无衬线字体形成有意区分 */
 .doc-preview {
-  padding: 20px 30px;
-  line-height: 2;
+  background: #fff;
+  max-width: 794px; /* A4 宽度 @96dpi */
+  min-height: 1000px;
+  margin: 0 auto;
+  padding: 60px 70px;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+  font-family: 'SimSun', '宋体', 'Songti SC', serif;
   font-size: 15px;
-  min-height: 400px;
+  line-height: 2;
+  color: #1a1a1a;
 }
 .doc-preview :deep(h1) {
+  font-family: 'SimHei', '黑体', 'Heiti SC', sans-serif;
   text-align: center;
   font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 28px;
+}
+.doc-preview :deep(h2),
+.doc-preview :deep(h3) {
+  font-family: 'SimHei', '黑体', 'Heiti SC', sans-serif;
+  font-size: 16px;
+  margin: 18px 0 8px;
 }
 .doc-preview :deep(p) {
   text-indent: 2em;
+  margin: 8px 0;
 }
 </style>
