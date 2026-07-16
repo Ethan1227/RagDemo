@@ -4,21 +4,62 @@
       <template #header>
         <div class="card-header">
           <span>证据材料</span>
-          <el-button type="primary" size="small" @click="uploadDialog = true">
-            <el-icon><UploadFilled /></el-icon>&nbsp;上传证据
-          </el-button>
         </div>
       </template>
 
-      <el-alert type="info" :closable="false" show-icon class="tip"
-        title="支持图片(png/jpg/bmp)、PDF、TXT；上传后自动 OCR 识别并抽取金额/日期/当事人等关键信息。" />
+      <!-- 顶部常驻上传区：拖拽/点击上传 + 分类与关联案件 -->
+      <div class="upload-zone">
+        <el-upload
+          drag
+          :auto-upload="false"
+          :limit="1"
+          :file-list="uploadList"
+          :on-change="(f, list) => { uploadFile = f.raw; uploadList = list }"
+          :on-remove="() => { uploadFile = null; uploadList = [] }"
+          accept=".png,.jpg,.jpeg,.bmp,.pdf,.txt"
+          class="upload-drag"
+        >
+          <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+          <div class="el-upload__text">拖拽文件到此处，或<em>点击选择</em></div>
+          <template #tip>
+            <div class="el-upload__tip">
+              支持图片(png/jpg/bmp)、PDF、TXT，不超过 20MB；上传后自动 OCR 识别并抽取金额/日期/当事人等关键信息
+            </div>
+          </template>
+        </el-upload>
+        <div class="upload-side">
+          <el-form label-width="76px" label-position="left" size="default">
+            <el-form-item label="证据分类">
+              <el-select v-model="uploadForm.category">
+                <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="关联案件">
+              <el-select v-model="uploadForm.caseId" clearable placeholder="可选">
+                <el-option v-for="c in cases" :key="c.id" :label="c.title" :value="c.id" />
+              </el-select>
+            </el-form-item>
+          </el-form>
+          <el-button
+            type="primary"
+            :loading="uploading"
+            :disabled="!uploadFile"
+            style="width: 100%"
+            @click="submitUpload"
+          >上传并识别</el-button>
+        </div>
+      </div>
 
       <el-table :data="evidences" stripe>
         <el-table-column prop="name" label="名称" min-width="160" show-overflow-tooltip>
           <template #default="{ row }">{{ row.name || row.filename }}</template>
         </el-table-column>
-        <el-table-column prop="category" label="分类" width="100">
-          <template #default="{ row }"><el-tag size="small" effect="plain">{{ row.category }}</el-tag></template>
+        <el-table-column prop="category" label="分类" width="130">
+          <template #default="{ row }">
+            <el-select v-model="row.category" size="small" @change="changeCategory(row)">
+              <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
+            </el-select>
+          </template>
         </el-table-column>
         <el-table-column prop="file_type" label="类型" width="70" />
         <el-table-column label="OCR 状态" width="110">
@@ -28,6 +69,13 @@
             <el-tag v-else type="warning" size="small">
               <el-icon class="is-loading"><Loading /></el-icon>&nbsp;处理中
             </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="核对" width="90">
+          <template #default="{ row }">
+            <el-tag v-if="confirmState(row) === 'unconfirmed'" type="warning" size="small" effect="plain">待确认</el-tag>
+            <el-tag v-else-if="confirmState(row) === 'confirmed'" type="success" size="small" effect="plain">已核对</el-tag>
+            <span v-else>—</span>
           </template>
         </el-table-column>
         <el-table-column label="关联案件" width="90">
@@ -42,36 +90,6 @@
       </el-table>
     </el-card>
 
-    <!-- 上传对话框 -->
-    <el-dialog v-model="uploadDialog" title="上传证据材料" width="520px">
-      <el-upload drag :auto-upload="false" :limit="1" :on-change="(f) => (uploadFile = f.raw)"
-        :on-remove="() => (uploadFile = null)" accept=".png,.jpg,.jpeg,.bmp,.pdf,.txt">
-        <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
-        <div class="el-upload__text">拖拽文件到此处，或<em>点击选择</em></div>
-        <template #tip>
-          <div class="el-upload__tip">图片 / PDF / TXT，不超过 20MB</div>
-        </template>
-      </el-upload>
-      <el-form label-width="90px" class="upload-form">
-        <el-form-item label="证据分类">
-          <el-select v-model="uploadForm.category">
-            <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="关联案件">
-          <el-select v-model="uploadForm.caseId" clearable placeholder="可选">
-            <el-option v-for="c in cases" :key="c.id" :label="c.title" :value="c.id" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="uploadDialog = false">取消</el-button>
-        <el-button type="primary" :loading="uploading" :disabled="!uploadFile" @click="submitUpload">
-          上传并识别
-        </el-button>
-      </template>
-    </el-dialog>
-
     <!-- 详情抽屉 -->
     <el-drawer v-model="detailVisible" title="证据详情" size="46%">
       <div v-if="detail" class="detail">
@@ -85,7 +103,11 @@
           class="detail-block" :title="'识别失败：' + detail.error_msg" />
 
         <template v-if="detail.ocr_status === 'done'">
-          <h4 class="detail-title">抽取的关键信息（可修正）</h4>
+          <h4 class="detail-title">
+            抽取的关键信息（可修正）
+            <el-tag v-if="confirmState(detail) === 'unconfirmed'" type="warning" size="small" effect="plain">待确认</el-tag>
+            <el-tag v-else type="success" size="small" effect="plain">已核对</el-tag>
+          </h4>
           <el-form label-width="80px">
             <el-form-item label="当事人">
               <el-input v-model="editParties" placeholder="多个用、分隔" />
@@ -99,7 +121,7 @@
             <el-form-item label="摘要">
               <el-input v-model="editSummary" type="textarea" :rows="2" />
             </el-form-item>
-            <el-button type="primary" size="small" @click="saveExtracted">保存修正</el-button>
+            <el-button type="primary" size="small" @click="saveExtracted">核对无误，保存</el-button>
           </el-form>
 
           <h4 class="detail-title">OCR 识别全文</h4>
@@ -115,14 +137,15 @@ import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { evidenceApi } from '@/api/evidence'
 import { caseApi } from '@/api/case'
+import { confirmState } from '@/utils/evidence'
 
 const evidences = ref([])
 const cases = ref([])
 const categories = ref([])
 
-const uploadDialog = ref(false)
 const uploading = ref(false)
 const uploadFile = ref(null)
+const uploadList = ref([])
 const uploadForm = reactive({ category: '书证', caseId: null })
 
 const detailVisible = ref(false)
@@ -155,12 +178,18 @@ async function submitUpload() {
   try {
     await evidenceApi.upload(uploadFile.value, uploadForm.category, '', uploadForm.caseId)
     ElMessage.success('上传成功，正在后台识别')
-    uploadDialog.value = false
     uploadFile.value = null
+    uploadList.value = []
     await loadEvidences()
   } finally {
     uploading.value = false
   }
+}
+
+/** 表格内直接修改分类 */
+async function changeCategory(row) {
+  await evidenceApi.update(row.id, { category: row.category })
+  ElMessage.success('分类已更新')
 }
 
 async function removeEvidence(row) {
@@ -196,9 +225,11 @@ async function saveExtracted() {
     amounts: splitField(editAmounts.value),
     dates: splitField(editDates.value),
     summary: editSummary.value,
+    confirmed: true, // 人工核对标记：保存即视为已核对
   }
   await evidenceApi.update(detail.value.id, { extracted })
-  ElMessage.success('已保存修正')
+  detail.value.extracted = extracted
+  ElMessage.success('已保存，标记为已核对')
   await loadEvidences()
 }
 
@@ -218,22 +249,39 @@ onUnmounted(() => clearTimeout(pollTimer))
   font-weight: 600;
   color: var(--brand-primary);
 }
-.tip {
-  margin-bottom: 16px;
+/* 顶部常驻上传区：拖拽区 + 右侧分类/案件表单 */
+.upload-zone {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--color-border);
 }
-.upload-form {
-  margin-top: 16px;
+.upload-drag {
+  flex: 1;
+  min-width: 0;
+}
+.upload-side {
+  width: 260px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 .detail-title {
   color: var(--brand-primary);
   margin: 18px 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .detail-block {
   margin-top: 16px;
 }
 .ocr-text {
-  background: #f4f6f9;
-  border-radius: 8px;
+  background: var(--color-bg-page);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
   padding: 12px;
   font-size: 13px;
   line-height: 1.8;
